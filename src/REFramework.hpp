@@ -39,6 +39,10 @@ public:
         m_error = err;
     }
 
+    bool isReady() const {
+        return m_gameDataInitialized;
+    }
+
     void onFrame();
     void onReset();
     bool onMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -58,6 +62,7 @@ private:
     bool m_valid{ false };
     bool m_initialized{ false };
     bool m_drawUI{ true };
+    std::atomic<bool> m_gameDataInitialized{ false };
 
     std::mutex m_inputMutex{};
     

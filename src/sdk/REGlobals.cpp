@@ -20,7 +20,12 @@ REGlobals::REGlobals() {
     for (auto i = utility::scan(start, end - start, pat); i.has_value(); i = utility::scan(*i + 1, end - (*i + 1), pat)) {
         auto ptr = utility::calculateAbsolute(*i + 3);
 
-        if (ptr == 0 || IsBadReadPtr((void*)ptr, sizeof(void*))) {
+        // Make sure the pointer is aligned on an 8-byte boundary.
+        if (ptr == 0 || ((uintptr_t)ptr & (sizeof(void*) - 1)) != 0) {
+            continue;
+        }
+
+        if (IsBadReadPtr((void*)ptr, sizeof(void*))) {
             continue;
         }
 
@@ -29,14 +34,10 @@ REGlobals::REGlobals() {
         if (m_objects.find(objPtr) != m_objects.end()) {
             continue;
         }
-
-        spdlog::debug("{:x}", (uintptr_t)objPtr);
         
         m_objects.insert(objPtr);
         m_objectList.push_back(objPtr);
     }
-
-    refreshMap();
 
     spdlog::info("Finished REGlobals initialization");
 }
@@ -77,25 +78,28 @@ void REGlobals::refreshMap() {
     for (auto objPtr : m_objects) {
         auto obj = *objPtr;
 
-        if (obj == nullptr) {
+        // Make sure the pointer is aligned on an 8-byte boundary.
+        if (obj == nullptr || ((uintptr_t)obj & (sizeof(void*) - 1)) != 0) {
             continue;
         }
 
-        if (!utility::REManagedObject::isManagedObject(obj)) {
+        if (IsBadReadPtr(obj, sizeof(REManagedObject))) {
             continue;
         }
 
-        auto t = utility::REManagedObject::getType(obj);
+        auto t = utility::REManagedObject::safeGetType(obj);
 
         if (t == nullptr || t->name == nullptr) {
             continue;
         }
 
         if (m_acknowledgedObjects.find(objPtr) == m_acknowledgedObjects.end()) {
+#ifdef DEVELOPER
             spdlog::info("{:x}->{:x} ({:s})", (uintptr_t)objPtr, (uintptr_t)*objPtr, t->name);
+#endif
+            m_acknowledgedObjects.insert(objPtr);
         }
 
         m_objectMap[t->name] = objPtr;
-        m_acknowledgedObjects.insert(objPtr);
     }
 }
